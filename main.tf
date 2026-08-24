@@ -152,4 +152,3 @@ resource "azurerm_subnet_network_security_group_association" "k8sapp" {
   subnet_id                 = azurerm_subnet.k8sapp.id
   network_security_group_id = azurerm_network_security_group.k8sapp.id
 }
-``
