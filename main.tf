@@ -16,6 +16,12 @@ provider "azurerm" {
 }
 
 ###################################################
+# Current Azure Client Configuration
+###################################################
+
+data "azurerm_client_config" "current" {}
+
+###################################################
 # Resource Groups - Central India
 ###################################################
 
@@ -55,6 +61,10 @@ resource "azurerm_virtual_network" "github" {
   address_space = ["10.10.0.0/22"]
 }
 
+###################################################
+# GitHub Workload Subnet
+###################################################
+
 resource "azurerm_subnet" "github" {
   name                 = "snet-github-dev-inc-01"
   resource_group_name  = azurerm_resource_group.github_net.name
@@ -62,6 +72,24 @@ resource "azurerm_subnet" "github" {
 
   address_prefixes = ["10.10.0.0/27"]
 }
+
+###################################################
+# GitHub PaaS / Private Endpoint Subnet
+###################################################
+
+resource "azurerm_subnet" "github_paas" {
+  name                 = "snet-paas-dev-inc-01"
+  resource_group_name  = azurerm_resource_group.github_net.name
+  virtual_network_name = azurerm_virtual_network.github.name
+
+  # 10.10.0.0/27 is already used by the GitHub subnet.
+  # Therefore, the next available /27 address range is used.
+  address_prefixes = ["10.10.0.32/27"]
+}
+
+###################################################
+# GitHub Network Security Group
+###################################################
 
 resource "azurerm_network_security_group" "github" {
   name                = "nsg-github-dev-inc-01"
@@ -93,8 +121,17 @@ resource "azurerm_network_security_group" "github" {
   }
 }
 
+###################################################
+# GitHub Subnet NSG Associations
+###################################################
+
 resource "azurerm_subnet_network_security_group_association" "github" {
   subnet_id                 = azurerm_subnet.github.id
+  network_security_group_id = azurerm_network_security_group.github.id
+}
+
+resource "azurerm_subnet_network_security_group_association" "github_paas" {
+  subnet_id                 = azurerm_subnet.github_paas.id
   network_security_group_id = azurerm_network_security_group.github.id
 }
 
@@ -110,6 +147,10 @@ resource "azurerm_virtual_network" "k8sapp" {
   address_space = ["10.20.0.0/22"]
 }
 
+###################################################
+# K8S APP Subnet
+###################################################
+
 resource "azurerm_subnet" "k8sapp" {
   name                 = "snet-k8sapp-dev-sa-01"
   resource_group_name  = azurerm_resource_group.k8s_net.name
@@ -117,6 +158,10 @@ resource "azurerm_subnet" "k8sapp" {
 
   address_prefixes = ["10.20.0.0/27"]
 }
+
+###################################################
+# K8S APP Network Security Group
+###################################################
 
 resource "azurerm_network_security_group" "k8sapp" {
   name                = "nsg-k8sapp-dev-sa-01"
@@ -148,7 +193,136 @@ resource "azurerm_network_security_group" "k8sapp" {
   }
 }
 
+###################################################
+# K8S APP Subnet NSG Association
+###################################################
+
 resource "azurerm_subnet_network_security_group_association" "k8sapp" {
   subnet_id                 = azurerm_subnet.k8sapp.id
   network_security_group_id = azurerm_network_security_group.k8sapp.id
+}
+
+###################################################
+# VNET Peering
+#
+# Peering is created in both directions:
+# 1. GitHub VNET to K8S APP VNET
+# 2. K8S APP VNET to GitHub VNET
+###################################################
+
+resource "azurerm_virtual_network_peering" "github_to_k8sapp" {
+  name                      = "peer-github-to-k8sapp"
+  resource_group_name       = azurerm_resource_group.github_net.name
+  virtual_network_name      = azurerm_virtual_network.github.name
+  remote_virtual_network_id = azurerm_virtual_network.k8sapp.id
+
+  allow_virtual_network_access = true
+  allow_forwarded_traffic      = false
+  allow_gateway_transit        = false
+  use_remote_gateways          = false
+}
+
+resource "azurerm_virtual_network_peering" "k8sapp_to_github" {
+  name                      = "peer-k8sapp-to-github"
+  resource_group_name       = azurerm_resource_group.k8s_net.name
+  virtual_network_name      = azurerm_virtual_network.k8sapp.name
+  remote_virtual_network_id = azurerm_virtual_network.github.id
+
+  allow_virtual_network_access = true
+  allow_forwarded_traffic      = false
+  allow_gateway_transit        = false
+  use_remote_gateways          = false
+}
+
+###################################################
+# Azure Key Vault
+#
+# The Key Vault remains in the application
+# resource group, as requested.
+###################################################
+
+resource "azurerm_key_vault" "github" {
+  name                = "kv-github-dec-inc-01"
+  location            = azurerm_resource_group.github_app.location
+  resource_group_name = azurerm_resource_group.github_app.name
+  tenant_id           = data.azurerm_client_config.current.tenant_id
+  sku_name             = "standard"
+
+  enable_rbac_authorization       = true
+  public_network_access_enabled   = false
+  purge_protection_enabled        = false
+  soft_delete_retention_days      = 7
+}
+
+###################################################
+# Key Vault Private DNS Zone
+#
+# Networking-related resource is created in:
+# rg-githubnet-dev-inc-01
+###################################################
+
+resource "azurerm_private_dns_zone" "key_vault" {
+  name                = "privatelink.vaultcore.azure.net"
+  resource_group_name = azurerm_resource_group.github_net.name
+}
+
+###################################################
+# Private DNS Zone Link - GitHub VNET
+###################################################
+
+resource "azurerm_private_dns_zone_virtual_network_link" "key_vault_github" {
+  name                  = "pdnslink-keyvault-github"
+  resource_group_name   = azurerm_resource_group.github_net.name
+  private_dns_zone_name = azurerm_private_dns_zone.key_vault.name
+  virtual_network_id    = azurerm_virtual_network.github.id
+
+  registration_enabled = false
+}
+
+###################################################
+# Private DNS Zone Link - K8S APP VNET
+#
+# This allows resources in the peered K8S VNET to
+# resolve the private Key Vault DNS name.
+###################################################
+
+resource "azurerm_private_dns_zone_virtual_network_link" "key_vault_k8sapp" {
+  name                  = "pdnslink-keyvault-k8sapp"
+  resource_group_name   = azurerm_resource_group.github_net.name
+  private_dns_zone_name = azurerm_private_dns_zone.key_vault.name
+  virtual_network_id    = azurerm_virtual_network.k8sapp.id
+
+  registration_enabled = false
+}
+
+###################################################
+# Key Vault Private Endpoint
+#
+# Private Endpoint networking resource is created in:
+# rg-githubnet-dev-inc-01
+#
+# It is connected to:
+# snet-paas-dev-inc-01
+###################################################
+
+resource "azurerm_private_endpoint" "key_vault" {
+  name                = "pep-kv-github-dec-inc-01"
+  location            = azurerm_resource_group.github_net.location
+  resource_group_name = azurerm_resource_group.github_net.name
+  subnet_id           = azurerm_subnet.github_paas.id
+
+  private_service_connection {
+    name                           = "psc-kv-github-dec-inc-01"
+    private_connection_resource_id = azurerm_key_vault.github.id
+    subresource_names              = ["vault"]
+    is_manual_connection           = false
+  }
+
+  private_dns_zone_group {
+    name = "pdnszg-kv-github-dec-inc-01"
+
+    private_dns_zone_ids = [
+      azurerm_private_dns_zone.key_vault.id
+    ]
+  }
 }
