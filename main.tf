@@ -295,7 +295,7 @@ resource "azurerm_key_vault" "github" {
   sku_name             = "standard"
 
   enable_rbac_authorization       = true
-  public_network_access_enabled   = false
+  public_network_access_enabled   = true
   purge_protection_enabled        = false
   soft_delete_retention_days      = 7
 }
