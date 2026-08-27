@@ -385,7 +385,7 @@ resource "azurerm_key_vault_secret" "github_client_id" {
 
 resource "azurerm_key_vault_secret" "github_installation_id" {
   name         = "github-installation-id"
-  value        = "12345678"
+  value        = "157009367"
   key_vault_id = azurerm_key_vault.github.id
 }
 
