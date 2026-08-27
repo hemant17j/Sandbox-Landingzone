@@ -326,3 +326,25 @@ resource "azurerm_private_endpoint" "key_vault" {
     ]
   }
 }
+
+###################################################
+# GitHub App Secrets
+###################################################
+
+resource "azurerm_key_vault_secret" "github_client_id" {
+  name         = "github-client-id"
+  value        = "Iv23xxxxxxxxxxxxxxxx"
+  key_vault_id = azurerm_key_vault.github.id
+}
+
+resource "azurerm_key_vault_secret" "github_installation_id" {
+  name         = "github-installation-id"
+  value        = "12345678"
+  key_vault_id = azurerm_key_vault.github.id
+}
+
+resource "azurerm_key_vault_secret" "github_private_key" {
+  name         = "github-private-key"
+  value        = file(pathexpand("~/repo/github-app.pem"))
+  key_vault_id = azurerm_key_vault.github.id
+}
