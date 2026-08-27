@@ -119,6 +119,29 @@ resource "azurerm_network_security_group" "github" {
     source_address_prefix      = "*"
     destination_address_prefix = "*"
   }
+  security_rule {
+    name                       = "Allow-SonarQube"
+    priority                   = 120
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "9000"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+
+  security_rule {
+    name                       = "Allow-Nexus"
+    priority                   = 130
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "8081"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
 }
 
 ###################################################
@@ -188,6 +211,29 @@ resource "azurerm_network_security_group" "k8sapp" {
     protocol                   = "Tcp"
     source_port_range          = "*"
     destination_port_range     = "3389"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+  security_rule {
+    name                       = "Allow-SonarQube"
+    priority                   = 120
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "9000"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+
+  security_rule {
+    name                       = "Allow-Nexus"
+    priority                   = 130
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "8081"
     source_address_prefix      = "*"
     destination_address_prefix = "*"
   }
