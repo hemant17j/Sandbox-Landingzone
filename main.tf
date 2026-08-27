@@ -242,7 +242,7 @@ resource "azurerm_virtual_network_peering" "k8sapp_to_github" {
 ###################################################
 
 resource "azurerm_key_vault" "github" {
-  name                = "kv-github-dec-inc-01"
+  name                = "kv-github-dev-inc-01"
   location            = azurerm_resource_group.github_app.location
   resource_group_name = azurerm_resource_group.github_app.name
   tenant_id           = data.azurerm_client_config.current.tenant_id
