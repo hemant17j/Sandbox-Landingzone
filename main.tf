@@ -333,7 +333,7 @@ resource "azurerm_private_endpoint" "key_vault" {
 
 resource "azurerm_key_vault_secret" "github_client_id" {
   name         = "github-client-id"
-  value        = "Iv23xxxxxxxxxxxxxxxx"
+  value        = "Iv23libuDCYzwklXQNT1"
   key_vault_id = azurerm_key_vault.github.id
 }
 
