@@ -300,6 +300,12 @@ resource "azurerm_key_vault" "github" {
   soft_delete_retention_days      = 7
 }
 
+resource "azurerm_role_assignment" "current_user_key_vault_admin" {
+  scope                = azurerm_key_vault.github.id
+  role_definition_name = "Key Vault Administrator"
+  principal_id         = data.azurerm_client_config.current.object_id
+}
+
 ###################################################
 # Key Vault Private DNS Zone
 #
@@ -381,16 +387,28 @@ resource "azurerm_key_vault_secret" "github_client_id" {
   name         = "github-client-id"
   value        = "Iv23libuDCYzwklXQNT1"
   key_vault_id = azurerm_key_vault.github.id
+
+  depends_on = [
+    azurerm_role_assignment.current_user_key_vault_admin
+  ]
 }
 
 resource "azurerm_key_vault_secret" "github_installation_id" {
   name         = "github-installation-id"
   value        = "157009367"
   key_vault_id = azurerm_key_vault.github.id
+
+  depends_on = [
+    azurerm_role_assignment.current_user_key_vault_admin
+  ]
 }
 
 resource "azurerm_key_vault_secret" "github_private_key" {
   name         = "github-private-key"
   value        = file(pathexpand("~/repo/hemantrunner.2026-08-27.private-key.pem"))
   key_vault_id = azurerm_key_vault.github.id
+
+  depends_on = [
+    azurerm_role_assignment.current_user_key_vault_admin
+  ]
 }
